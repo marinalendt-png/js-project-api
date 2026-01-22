@@ -19,20 +19,32 @@ app.get("/", (req, res) => {
   const endpoints = listEndpoints(app);
 
   res.json([{
-    message: "Welcome to the thoughts API",
+    message: "Welcome to the Happy thoughts API",
     endpoints: endpoints,
   }])
 });
 
+//Endpoint for all the thoughts
 app.get("/thoughts", (req, res) => {
   res.json(data)
 })
 
+//Endpoint for the thoughts id 
 app.get("/thoughts/:id", (req, res) => {
   const id = req.params.id
   const thoughtsId = data.find((thought) => (thought._id) === (id));
+
+  if (!thoughtsId) {
+    return res
+      .status(404)
+      .json({ error: `Thought with id ${id} does not exist` })
+  }
+
   res.json(thoughtsId)
 })
+
+//Endpoint for hearts/likes
+
 
 
 // Start the server
