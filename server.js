@@ -43,8 +43,29 @@ app.get("/thoughts/:id", (req, res) => {
   res.json(thoughtsId)
 })
 
-//Endpoint for hearts/likes
+//Endpoint for hearts amount 
+app.get("/thoughts/hearts/:amount", (req, res) => {
+  const amount = req.params.amount //Hämta amount från parametern
+  const minHearts = Number(amount) //Konvertera till number
 
+  //isNaN = is Not a Number. Om användare skulle ange något annat än ett nr, errormeddelandet upp. 
+  if (isNaN(minHearts)) {
+    return res
+      .status(400)
+      .json({ error: `The amount must be a number` })
+  }
+
+  const filteredThoughts = data.filter((thought) => thought.hearts >= minHearts) //filtrera datan - spara endast thoughts där hearts >= minHearts
+
+  if (filteredThoughts.length === 0) {
+    return res
+      .status(404)
+      .json({ error: `No thoughts found with ${amount} or more hearts` })
+  }
+
+  res.json(filteredThoughts); //returnera resultat
+
+})
 
 
 // Start the server
