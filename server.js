@@ -1,7 +1,9 @@
-import cors from "cors"
+import cors from "cors" //tillåter req från andra webplatser
 import express from "express"
 import data from "./data.json" with { type: "json" };
 import listEndpoints from "express-list-endpoints";
+import mongoose from "mongoose";
+import { Schema, model } from "mongoose";
 
 
 // Defines the port the app will run on. Defaults to 8080, but can be overridden
@@ -14,7 +16,25 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// Start defining your routes here. Endpoint! Response-object
+//Using MongoDB, connecting with database. 
+const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/thoughts"
+mongoose.connect(mongoUrl)
+mongoose.Promise = Promise
+
+//varje tanke som sparas i databasen måste följa denna struktur. Skapar mallen för datan. 
+const thoughtSchema = new Schema({
+  message: String,
+  hearts: Number,
+  createdAt: Date
+})
+
+//skapar verktyget för att hantera datan. Thought = namnet på samlingen i databasen. thoughtSchema = mallen vi skapade ovan. 
+const Thought = model("thought", thoughtSchema)
+
+
+// ENDPOINTS //
+
+// Showing all the endpoints
 app.get("/", (req, res) => {
   const endpoints = listEndpoints(app);
 
@@ -25,48 +45,57 @@ app.get("/", (req, res) => {
 });
 
 //Endpoint for all the thoughts
-app.get("/thoughts", (req, res) => {
-  res.json(data)
+app.get("/thoughts", async (req, res) => {
+  try {
+    const thoughts = await Thought.find()
+    res.json(thoughts)
+  } catch (error) {
+    res.status(500).json({ error: "Could not fetch thoughts" })
+  }
 })
 
-//Endpoint for the thoughts id 
-app.get("/thoughts/:id", (req, res) => {
-  const id = req.params.id
-  const thoughtsId = data.find((thought) => (thought._id) === (id));
 
-  if (!thoughtsId) {
-    return res
-      .status(404)
-      .json({ error: `Thought with id ${id} does not exist` })
+
+//Endpoint for the thoughts id, to get one thought
+app.get("/thoughts/:id", async (req, res) => {
+  try {
+    const id = req.params.id
+    const thoughtsId = await Thought.findById(id)
+
+    if (!thoughtsId) {
+      return res.status(404).json({ error: `Thought with id ${id} does not exist` })
+    }
+    res.json(thoughtsId)
+
+  } catch (error) {
+    return res.status(500).json({ error: `Could not fetch thoughts` })
   }
-
-  res.json(thoughtsId)
 })
 
-//Endpoint for hearts amount 
-app.get("/thoughts/hearts/:amount", (req, res) => {
-  const amount = req.params.amount //Hämta amount från parametern
-  const minHearts = Number(amount) //Konvertera till number
+//Endpoint for hearts amount, gets thoughts with x amount of hearts
+app.get("/thoughts/hearts/:amount", async (req, res) => {
+  try {
+    const amount = req.params.amount
+    const minHearts = Number(amount)
 
-  //isNaN = is Not a Number. Om användare skulle ange något annat än ett nr, errormeddelandet upp. 
-  if (isNaN(minHearts)) {
-    return res
-      .status(400)
-      .json({ error: `The amount must be a number` })
+    //isNaN = is Not a Number. Om användare skulle ange något annat än ett nr, errormeddelandet upp. 
+    if (isNaN(minHearts)) {
+      return res
+        .status(400)
+        .json({ error: `The amount must be a number` })
+    }
+
+    const filteredThoughts = await Thought.find({ hearts: { $gte: minHearts } })
+
+    if (filteredThoughts.length === 0) {
+      return res.status(404).json({ error: `No thoughts found with ${amount} or more hearts` })
+    }
+    res.json(filteredThoughts); //returnera resultat
+
+  } catch (error) {
+    res.status(500).json({ error: `Could not fetch thoughts` })
   }
-
-  const filteredThoughts = data.filter((thought) => thought.hearts >= minHearts) //filtrera datan - spara endast thoughts där hearts >= minHearts
-
-  if (filteredThoughts.length === 0) {
-    return res
-      .status(404)
-      .json({ error: `No thoughts found with ${amount} or more hearts` })
-  }
-
-  res.json(filteredThoughts); //returnera resultat
-
 })
-
 
 // Start the server
 app.listen(port, () => {
