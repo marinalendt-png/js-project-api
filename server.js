@@ -16,6 +16,15 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+//Error if the database is not responding. Also a middleware. 
+app.use((req, res, next) => {
+  if (mongoose.connection.readyState === 1) {
+    next()
+  } else {
+    res.status(503).json({ error: `Server unavailable` })
+  }
+})
+
 //Using MongoDB, connecting with database. 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/thoughts"
 mongoose.connect(mongoUrl)
@@ -54,13 +63,10 @@ app.get("/thoughts", async (req, res) => {
   }
 })
 
-
-
 //Endpoint for the thoughts id, to get one thought
 app.get("/thoughts/:id", async (req, res) => {
   try {
-    const id = req.params.id
-    const thoughtsId = await Thought.findById(id)
+    const thoughtsId = await Thought.findById(req.params.id)
 
     if (!thoughtsId) {
       return res.status(404).json({ error: `Thought with id ${id} does not exist` })
@@ -75,8 +81,7 @@ app.get("/thoughts/:id", async (req, res) => {
 //Endpoint for hearts amount, gets thoughts with x amount of hearts
 app.get("/thoughts/hearts/:amount", async (req, res) => {
   try {
-    const amount = req.params.amount
-    const minHearts = Number(amount)
+    const minHearts = Number(req.params.amount)
 
     //isNaN = is Not a Number. Om användare skulle ange något annat än ett nr, errormeddelandet upp. 
     if (isNaN(minHearts)) {
