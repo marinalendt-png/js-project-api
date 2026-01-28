@@ -4,6 +4,8 @@ import data from "./data.json" with { type: "json" };
 import listEndpoints from "express-list-endpoints";
 import mongoose from "mongoose";
 import { Schema, model } from "mongoose";
+import "dotenv/config";
+
 
 //MONGO_URL=mongodb://localhost:27017/happy-thoughts
 
