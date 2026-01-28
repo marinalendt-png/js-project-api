@@ -5,6 +5,7 @@ import listEndpoints from "express-list-endpoints";
 import mongoose from "mongoose";
 import { Schema, model } from "mongoose";
 
+//MONGO_URL=mongodb://localhost:27017/happy-thoughts
 
 // Defines the port the app will run on. Defaults to 8080, but can be overridden
 // when starting the server. Example command to overwrite PORT env variable value:
@@ -16,7 +17,7 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-//Error if the database is not responding. Also a middleware. 
+// Error if the database is not responding. Also a middleware. 
 app.use((req, res, next) => {
   if (mongoose.connection.readyState === 1) {
     next()
@@ -25,24 +26,32 @@ app.use((req, res, next) => {
   }
 })
 
-//Using MongoDB, connecting with database. 
+// Using MongoDB, connecting with database. 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/thoughts"
-mongoose.connect(mongoUrl)
+mongoose.connect(mongoUrl);
 mongoose.Promise = Promise
 
-//varje tanke som sparas i databasen måste följa denna struktur. Skapar mallen för datan. 
+// varje tanke som sparas i databasen måste följa denna struktur. Skapar mallen för datan. 
 const thoughtSchema = new Schema({
-  message: String,
-  hearts: Number,
-  createdAt: Date
+  message: {
+    type: String,
+    required: true
+  },
+  hearts: {
+    type: Number,
+    default: 0,
+  },
+  createdAt: {
+    type: Date,
+    default: () => new Date()
+  }
 })
 
-//skapar verktyget för att hantera datan. Thought = namnet på samlingen i databasen. thoughtSchema = mallen vi skapade ovan. 
-const Thought = model("thought", thoughtSchema)
+// skapar verktyget för att hantera datan. Thought = namnet på samlingen i databasen. thoughtSchema = mallen vi skapade ovan. 
+const Thought = mongoose.model("thought", thoughtSchema)
 
 
 // ENDPOINTS //
-
 // Showing all the endpoints
 app.get("/", (req, res) => {
   const endpoints = listEndpoints(app);
@@ -99,6 +108,23 @@ app.get("/thoughts/hearts/:amount", async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ error: `Could not fetch thoughts` })
+  }
+})
+
+//Här sparas nya thoughts som användaren skapar. Här skapas nya thoughts. 
+app.post("/thoughts", async (req, res) => {
+  try {
+    const { message } = req.body
+
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: `Message is required` })
+    }
+
+    const newThought = await Thought.create({ message })
+
+    res.status(201).json(newThought)
+  } catch (error) {
+    res.status(500).json({ error: `Could not create thought` })
   }
 })
 
