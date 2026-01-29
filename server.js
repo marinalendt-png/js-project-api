@@ -33,7 +33,7 @@ const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/thoughts"
 mongoose.connect(mongoUrl);
 mongoose.Promise = Promise
 
-// varje tanke som sparas i databasen måste följa denna struktur/schema. Skapar mallen för datan. 
+// Schema
 const thoughtSchema = new mongoose.Schema({
   message: {
     type: String,
@@ -49,7 +49,7 @@ const thoughtSchema = new mongoose.Schema({
   }
 })
 
-// skapar verktyget/model för att hantera datan. Thought = namnet på samlingen i databasen. thoughtSchema = mallen vi skapade ovan. 
+// Model
 const Thought = mongoose.model("thought", thoughtSchema)
 
 //Seeding of DB, resetting the database
@@ -69,8 +69,7 @@ if (process.env.RESET_DB) {
   seedDatabase()
 }
 
-// ENDPOINTS //
-// Showing all the endpoints
+//GET-method. Showing all the endpoints and documentation. 
 app.get("/", (req, res) => {
   const endpoints = listEndpoints(app);
 
@@ -80,7 +79,7 @@ app.get("/", (req, res) => {
   }])
 });
 
-//Endpoint for all the thoughts
+//GET-method. Endpoint for all the thoughts. 
 app.get("/thoughts", async (req, res) => {
   try {
     const thoughts = await Thought.find()
@@ -90,7 +89,7 @@ app.get("/thoughts", async (req, res) => {
   }
 })
 
-//Endpoint for the thoughts id, to get one thought
+//GET-method. Endpoint for the thoughts id, to get one specific thought. 
 app.get("/thoughts/:id", async (req, res) => {
   try {
     const thoughtsId = await Thought.findById(req.params.id)
@@ -105,12 +104,12 @@ app.get("/thoughts/:id", async (req, res) => {
   }
 })
 
-//Endpoint for hearts amount, gets thoughts with x amount of hearts
+//GET-method. Endpoint for hearts amount, gets thoughts with x amount of hearts
 app.get("/thoughts/hearts/:amount", async (req, res) => {
   try {
     const minHearts = Number(req.params.amount)
 
-    //isNaN = is Not a Number. Om användare skulle ange något annat än ett nr, errormeddelandet upp. 
+    //isNaN = is Not a Number
     if (isNaN(minHearts)) {
       return res
         .status(400)
@@ -122,14 +121,14 @@ app.get("/thoughts/hearts/:amount", async (req, res) => {
     if (filteredThoughts.length === 0) {
       return res.status(404).json({ error: `No thoughts found with ${amount} or more hearts` })
     }
-    res.json(filteredThoughts); //returnera resultat
+    res.json(filteredThoughts);
 
   } catch (error) {
     res.status(500).json({ error: `Could not fetch thoughts` })
   }
 })
 
-//Här sparas nya thoughts som användaren skapar. Här skapas nya thoughts. 
+//POST-method. Adding a new message to the database
 app.post("/thoughts", async (req, res) => {
   try {
     const { message } = req.body
@@ -143,6 +142,45 @@ app.post("/thoughts", async (req, res) => {
     res.status(201).json(newThought)
   } catch (error) {
     res.status(500).json({ error: `Could not create thought` })
+  }
+})
+
+//PATCH-Method, updates a thought when liked. 
+app.patch("/thoughts/:id", async (req, res) => {
+  try {
+    const id = req.params.id
+    const { hearts } = req.body
+    if (isNaN(hearts)) {
+      return res.status(400).json({ error: "Hearts must be a number" })
+    }
+    const updatedThought = await Thought.findByIdAndUpdate(
+      id,
+      { hearts: hearts },
+      { new: true }
+    )
+
+    if (!updatedThought) {
+      return res.status(404).json({ error: "Thought not found" })
+    }
+    res.json(updatedThought)
+
+  } catch (error) {
+    res.json(500).json({ error: "Could not update thought" })
+  }
+})
+
+//DELETE-method, deletes a thought
+app.delete("/thoughts/:id", async (req, res) => {
+  try {
+    const id = req.params.id
+    const deletedThought = await Thought.findByIdAndDelete(id)
+
+    if (!deletedThought) {
+      return res.status(404).json({ error: `Thought with id ${id} does not exist` })
+    }
+    res.json(deletedThought)
+  } catch (error) {
+    res.status(500).json({ error: "Could not delete thought " })
   }
 })
 
