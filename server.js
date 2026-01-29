@@ -33,8 +33,8 @@ const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/thoughts"
 mongoose.connect(mongoUrl);
 mongoose.Promise = Promise
 
-// varje tanke som sparas i databasen måste följa denna struktur. Skapar mallen för datan. 
-const thoughtSchema = new Schema({
+// varje tanke som sparas i databasen måste följa denna struktur/schema. Skapar mallen för datan. 
+const thoughtSchema = new mongoose.Schema({
   message: {
     type: String,
     required: true
@@ -49,9 +49,25 @@ const thoughtSchema = new Schema({
   }
 })
 
-// skapar verktyget för att hantera datan. Thought = namnet på samlingen i databasen. thoughtSchema = mallen vi skapade ovan. 
+// skapar verktyget/model för att hantera datan. Thought = namnet på samlingen i databasen. thoughtSchema = mallen vi skapade ovan. 
 const Thought = mongoose.model("thought", thoughtSchema)
 
+//Seeding of DB, resetting the database
+if (process.env.RESET_DB) {
+  const seedDatabase = async () => {
+    const count = await Thought.countDocuments() //Räknar dokument 
+    if (count > 0) {
+      return //om det finns dokument redan, gör inget
+    }
+    //om vi kommer hit, databasen är tom - seeda!
+    await Thought.deleteMany()
+    data.forEach(thought => {
+      new Thought(thought).save()
+    })
+  }
+
+  seedDatabase()
+}
 
 // ENDPOINTS //
 // Showing all the endpoints
