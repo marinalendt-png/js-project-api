@@ -1,13 +1,12 @@
-import cors from "cors" //tillåter req från andra webplatser
-import express from "express"
+import cors from "cors";
+import express from "express";
 import data from "./data.json" with { type: "json" };
 import listEndpoints from "express-list-endpoints";
 import mongoose from "mongoose";
 import { Schema, model } from "mongoose";
 import "dotenv/config";
-
-
-//MONGO_URL=mongodb://localhost:27017/happy-thoughts
+import crypto from "crypto";
+import bcrypt from "bcrypt"
 
 // Defines the port the app will run on. Defaults to 8080, but can be overridden
 // when starting the server. Example command to overwrite PORT env variable value:
@@ -29,11 +28,30 @@ app.use((req, res, next) => {
 })
 
 // Using MongoDB, connecting with database. 
-const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/thoughts"
+const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/auth"
 mongoose.connect(mongoUrl);
 mongoose.Promise = Promise
 
 // Schema
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    unique: true
+  },
+  email: {
+    type: String,
+    unique: true,
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  accessToken: {
+    type: String,
+    default: () => crypto.randomBytes(128).toString("hex")
+  }
+});
+
 const thoughtSchema = new mongoose.Schema({
   message: {
     type: String,
@@ -49,25 +67,24 @@ const thoughtSchema = new mongoose.Schema({
   }
 })
 
-// Model
-const Thought = mongoose.model("thought", thoughtSchema)
+// Models
+const User = mongoose.model("User", userSchema);
+const Thought = mongoose.model("thought", thoughtSchema);
 
-//Seeding of DB, resetting the database
-if (process.env.RESET_DB) {
-  const seedDatabase = async () => {
-    const count = await Thought.countDocuments() //Räknar dokument 
-    if (count > 0) {
-      return //om det finns dokument redan, gör inget
-    }
-    //om vi kommer hit, databasen är tom - seeda!
-    await Thought.deleteMany()
-    data.forEach(thought => {
-      new Thought(thought).save()
-    })
+// Middelware-function that looks up the user
+const authenticateUser = async (req, res, next) => {
+  const user = await User.findOne({
+    accessToken: req.header("Authorization")
+  });
+  if (user) {
+    req.user = user
+    next();
+  } else {
+    res.status(401).json({
+      loggedOut: true
+    });
   }
-
-  seedDatabase()
-}
+};
 
 //GET-method. Showing all the endpoints and documentation. 
 app.get("/", (req, res) => {
@@ -95,7 +112,7 @@ app.get("/thoughts/:id", async (req, res) => {
     const thoughtsId = await Thought.findById(req.params.id)
 
     if (!thoughtsId) {
-      return res.status(404).json({ error: `Thought with id ${id} does not exist` })
+      return res.status(404).json({ error: `Thought with id ${thoughtsId} does not exist` })
     }
     res.json(thoughtsId)
 
@@ -119,7 +136,7 @@ app.get("/thoughts/hearts/:amount", async (req, res) => {
     const filteredThoughts = await Thought.find({ hearts: { $gte: minHearts } })
 
     if (filteredThoughts.length === 0) {
-      return res.status(404).json({ error: `No thoughts found with ${amount} or more hearts` })
+      return res.status(404).json({ error: `No thoughts found with ${minHearts} or more hearts` })
     }
     res.json(filteredThoughts);
 
@@ -145,27 +162,80 @@ app.post("/thoughts", async (req, res) => {
   }
 })
 
+//POST-Method, creates a new user. Registration endpoint. 
+app.post("/users", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Name, email and password are required" });
+    }
+
+    const salt = bcrypt.genSaltSync()
+    const user = new User({ name, email, password: bcrypt.hashSync(password, salt) });
+    await user.save();
+    res.status(201).json({
+      success: true,
+      message: "User created",
+      id: user._id,
+      accessToken: user.accessToken
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(400).json({
+      success: false,
+      message: "Could not create user",
+      errors: error
+    });
+  }
+});
+
+app.post("/sessions", async (req, res) => {
+  const user = await User.findOne({
+    email: req.body.email
+  })
+  if (user && bcrypt.compareSync(req.body.password, user.password)) {
+    res.json({ userId: user._id })
+  } else {
+    res.json({ notFound: true })
+  }
+})
+
 //PATCH-Method, updates a thought when liked. 
 app.patch("/thoughts/:id", async (req, res) => {
   try {
     const id = req.params.id
-    const { hearts } = req.body
-    if (isNaN(hearts)) {
-      return res.status(400).json({ error: "Hearts must be a number" })
+    const { message, hearts } = req.body
+
+    const update = {}
+
+    if (message !== undefined) {
+      if (message.trim().length === 0) {
+        return res.status(400).json({ error: "Message can not be empty" })
+      }
+      update.message = message
     }
+
+    if (hearts !== undefined) {
+      if (isNaN(hearts)) {
+        return res.status(400).json({ error: "Hearts must be a number" })
+      }
+      update.hearts = hearts
+    }
+
     const updatedThought = await Thought.findByIdAndUpdate(
       id,
-      { hearts: hearts },
+      update,
       { new: true }
     )
 
     if (!updatedThought) {
       return res.status(404).json({ error: "Thought not found" })
     }
-    res.json(updatedThought)
 
+    res.json(updatedThought)
   } catch (error) {
-    res.json(500).json({ error: "Could not update thought" })
+    res.status(500).json({ error: "Could not update thought" })
   }
 })
 
@@ -184,7 +254,32 @@ app.delete("/thoughts/:id", async (req, res) => {
   }
 })
 
+// GET-method, secret endpoint. 
+app.get("/secrets", authenticateUser);
+app.get("/secrets", (req, res) => {
+  res.json({ secret: "This is a super secret message." })
+})
+
+// Log-in endpoint. Finds user. 
+app.post("/sessions", async () => {
+  const user = await User.findOne({ email: req.body.email });
+  if (user && bcrypt.compareSync(req.body.password, user.password)) {
+    res.json({ userId: user._id, accessToken: user.accessToken });
+  } else {
+    res.json({ notFound: true });
+  }
+});
+
 // Start the server
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`)
+})
+
+// Graceful shutdown for Nodemon
+process.on('SIGTERM', () => {
+  console.log('Server shutting down...')
+  server.close(() => {
+    mongoose.connection.close()
+    process.exit(0)
+  })
 })
