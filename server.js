@@ -110,7 +110,7 @@ app.post("/users", async (req, res) => {
   }
 });
 
-// POST-method. Log-in endpoint. Finds user. 
+// Log-in endpoint. Finds user. 
 app.post("/sessions", async (req, res) => {
   const user = await User.findOne({ email: req.body.email });
   if (user && bcrypt.compareSync(req.body.password, user.password)) {
