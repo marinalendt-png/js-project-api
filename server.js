@@ -1,16 +1,12 @@
 import cors from "cors";
 import express from "express";
-import data from "./data.json" with { type: "json" };
 import listEndpoints from "express-list-endpoints";
 import mongoose from "mongoose";
-import { Schema, model } from "mongoose";
 import "dotenv/config";
 import crypto from "crypto";
-import bcrypt from "bcrypt"
+import bcrypt from "bcrypt";
 
-// Defines the port the app will run on. Defaults to 8080, but can be overridden
-// when starting the server. Example command to overwrite PORT env variable value:
-// PORT=9000 npm start
+// ======= Config & setup =======
 const port = process.env.PORT || 9090
 const app = express()
 
@@ -25,14 +21,14 @@ app.use((req, res, next) => {
   } else {
     res.status(503).json({ error: `Server unavailable` })
   }
-})
+});
 
-// Using MongoDB, connecting with database. 
+// ======= Database connection =======
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/auth"
 mongoose.connect(mongoUrl);
 mongoose.Promise = Promise
 
-// Schema
+// ======= Schemas & Models =======
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -67,11 +63,10 @@ const thoughtSchema = new mongoose.Schema({
   }
 })
 
-// Models
 const User = mongoose.model("User", userSchema);
 const Thought = mongoose.model("thought", thoughtSchema);
 
-// Middelware-function that looks up the user
+// ======= Middleware-function =======
 const authenticateUser = async (req, res, next) => {
   const user = await User.findOne({
     accessToken: req.header("Authorization")
@@ -86,83 +81,8 @@ const authenticateUser = async (req, res, next) => {
   }
 };
 
-//GET-method. Showing all the endpoints and documentation. 
-app.get("/", (req, res) => {
-  const endpoints = listEndpoints(app);
-
-  res.json([{
-    message: "Welcome to the Happy thoughts API",
-    endpoints: endpoints,
-  }])
-});
-
-//GET-method. Endpoint for all the thoughts. 
-app.get("/thoughts", async (req, res) => {
-  try {
-    const thoughts = await Thought.find()
-    res.json(thoughts)
-  } catch (error) {
-    res.status(500).json({ error: "Could not fetch thoughts" })
-  }
-})
-
-//GET-method. Endpoint for the thoughts id, to get one specific thought. 
-app.get("/thoughts/:id", async (req, res) => {
-  try {
-    const thoughtsId = await Thought.findById(req.params.id)
-
-    if (!thoughtsId) {
-      return res.status(404).json({ error: `Thought with id ${thoughtsId} does not exist` })
-    }
-    res.json(thoughtsId)
-
-  } catch (error) {
-    return res.status(500).json({ error: `Could not fetch thoughts` })
-  }
-})
-
-//GET-method. Endpoint for hearts amount, gets thoughts with x amount of hearts
-app.get("/thoughts/hearts/:amount", async (req, res) => {
-  try {
-    const minHearts = Number(req.params.amount)
-
-    //isNaN = is Not a Number
-    if (isNaN(minHearts)) {
-      return res
-        .status(400)
-        .json({ error: `The amount must be a number` })
-    }
-
-    const filteredThoughts = await Thought.find({ hearts: { $gte: minHearts } })
-
-    if (filteredThoughts.length === 0) {
-      return res.status(404).json({ error: `No thoughts found with ${minHearts} or more hearts` })
-    }
-    res.json(filteredThoughts);
-
-  } catch (error) {
-    res.status(500).json({ error: `Could not fetch thoughts` })
-  }
-})
-
-//POST-method. Adding a new message to the database
-app.post("/thoughts", async (req, res) => {
-  try {
-    const { message } = req.body
-
-    if (!message || message.trim().length === 0) {
-      return res.status(400).json({ error: `Message is required` })
-    }
-
-    const newThought = await Thought.create({ message })
-
-    res.status(201).json(newThought)
-  } catch (error) {
-    res.status(500).json({ error: `Could not create thought` })
-  }
-})
-
-//POST-Method, creates a new user. Registration endpoint. 
+// ======= Authentication routes (Login/Signup) =======
+// Creates a new user. Registration endpoint. 
 app.post("/users", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -190,18 +110,94 @@ app.post("/users", async (req, res) => {
   }
 });
 
+// POST-method. Log-in endpoint. Finds user. 
 app.post("/sessions", async (req, res) => {
-  const user = await User.findOne({
-    email: req.body.email
-  })
+  const user = await User.findOne({ email: req.body.email });
   if (user && bcrypt.compareSync(req.body.password, user.password)) {
-    res.json({ userId: user._id })
+    res.json({ userId: user._id, accessToken: user.accessToken });
   } else {
-    res.json({ notFound: true })
+    res.json({ notFound: true });
   }
-})
+});
 
-//PATCH-Method, updates a thought when liked. 
+// ======= Protected Routes =======
+app.get("/secrets", authenticateUser, (req, res) => {
+  res.json({ secret: "This is a super secret message." })
+});
+
+// ======= Thoughts Routes =======
+// Showing all the endpoints and documentation. 
+app.get("/", (req, res) => {
+  const endpoints = listEndpoints(app);
+
+  res.json([{
+    message: "Welcome to the Happy thoughts API",
+    endpoints: endpoints,
+  }])
+});
+
+// Endpoint for all the thoughts. 
+app.get("/thoughts", async (req, res) => {
+  try {
+    const thoughts = await Thought.find()
+    res.json(thoughts);
+  } catch (error) {
+    res.status(500).json({ error: "Could not fetch thoughts" })
+  }
+});
+
+// Endpoint for the thoughts id, to get one specific thought. 
+app.get("/thoughts/:id", async (req, res) => {
+  try {
+    const thoughtsId = await Thought.findById(req.params.id)
+
+    if (!thoughtsId) {
+      return res.status(404).json({ error: `Thought with id ${req.params.id} does not exist` })
+    }
+    res.json(thoughtsId)
+
+  } catch (error) {
+    return res.status(500).json({ error: `Could not fetch thoughts` })
+  }
+});
+
+// Adding a new message to the database
+app.post("/thoughts", async (req, res) => {
+  try {
+    const { message } = req.body
+
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: `Message is required` })
+    }
+
+    const newThought = await Thought.create({ message })
+
+    res.status(201).json(newThought)
+  } catch (error) {
+    res.status(500).json({ error: `Could not create thought` })
+  }
+});
+
+// Endpoint for liking a thought
+app.post("/thoughts/:id/like", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const thought = await Thought.findById(id);
+
+    if (!thought) {
+      return res.status(404).json({ error: "Thought not found" });
+    }
+    thought.hearts += 1;
+    await thought.save();
+    res.json(thought);
+
+  } catch (error) {
+    res.status(500).json({ error: "Could not like thought" });
+  }
+});
+
+
+// Updates a thought when liked. 
 app.patch("/thoughts/:id", async (req, res) => {
   try {
     const id = req.params.id
@@ -237,9 +233,9 @@ app.patch("/thoughts/:id", async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Could not update thought" })
   }
-})
+});
 
-//DELETE-method, deletes a thought
+// Deletes a thought
 app.delete("/thoughts/:id", async (req, res) => {
   try {
     const id = req.params.id
@@ -252,28 +248,12 @@ app.delete("/thoughts/:id", async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Could not delete thought " })
   }
-})
-
-// GET-method, secret endpoint. 
-app.get("/secrets", authenticateUser);
-app.get("/secrets", (req, res) => {
-  res.json({ secret: "This is a super secret message." })
-})
-
-// Log-in endpoint. Finds user. 
-app.post("/sessions", async () => {
-  const user = await User.findOne({ email: req.body.email });
-  if (user && bcrypt.compareSync(req.body.password, user.password)) {
-    res.json({ userId: user._id, accessToken: user.accessToken });
-  } else {
-    res.json({ notFound: true });
-  }
 });
 
 // Start the server
 const server = app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`)
-})
+});
 
 // Graceful shutdown for Nodemon
 process.on('SIGTERM', () => {
@@ -282,4 +262,4 @@ process.on('SIGTERM', () => {
     mongoose.connection.close()
     process.exit(0)
   })
-})
+}); 
