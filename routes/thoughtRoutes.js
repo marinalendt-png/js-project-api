@@ -30,7 +30,7 @@ router.get("/thoughts/:id", async (req, res) => {
 });
 
 // Adding a new message to the database
-router.post("/thoughts", async (req, res) => {
+router.post("/thoughts", authenticateUser, async (req, res) => {
   try {
     const { message } = req.body
 
@@ -66,7 +66,7 @@ router.post("/thoughts/:id/like", async (req, res) => {
 
 
 // Updates a thought - can update message and/or hearts
-router.patch("/thoughts/:id", async (req, res) => {
+router.patch("/thoughts/:id", authenticateUser, async (req, res) => {
   try {
     const id = req.params.id
     const { message, hearts } = req.body
@@ -104,7 +104,7 @@ router.patch("/thoughts/:id", async (req, res) => {
 });
 
 // Deletes a thought
-router.delete("/thoughts/:id", async (req, res) => {
+router.delete("/thoughts/:id", authenticateUser, async (req, res) => {
   try {
     const id = req.params.id
     const deletedThought = await Thought.findByIdAndDelete(id)
