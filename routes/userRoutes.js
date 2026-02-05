@@ -72,7 +72,7 @@ router.post("/sessions", async (req, res) => {
     }
     res.json({
       success: true,
-      message: "Login successfull",
+      message: "Login successful",
       response: {
         email: user.email,
         id: user._id,
@@ -87,7 +87,7 @@ router.post("/sessions", async (req, res) => {
   }
 });
 
-// ======= Protected Routes =======
+// ======= Protected Routes - not in use =======
 router.get("/secrets", authenticateUser, (req, res) => {
   res.json({ secret: "This is a super secret message." })
 });
