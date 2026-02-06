@@ -24,7 +24,7 @@ app.get("/", (req, res) => {
 });
 
 // Database connection
-const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/auth"
+const mongoUrl = process.env.MONGO_URL
 mongoose.connect(mongoUrl);
 
 app.use((req, res, next) => {

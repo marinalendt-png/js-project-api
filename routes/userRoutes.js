@@ -6,7 +6,7 @@ import { authenticateUser } from "../middleware/authMiddleware.js";
 export const router = express.Router();
 
 // Creates a new user. Sign-up 
-router.post("/users", async (req, res) => {
+router.post("/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -51,7 +51,7 @@ router.post("/users", async (req, res) => {
 });
 
 // Log-in endpoint. Finds user that has created an account. 
-router.post("/sessions", async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
