@@ -1,11 +1,43 @@
 # Project API
 
-This project includes the packages and babel setup for an express server, and is just meant to make things a little simpler to get up and running with.
+Render: https://js-project-api-e8xy.onrender.com
+Netlify: https://project-happy-thoughts-ml.netlify.app/
 
-## Getting started
+Welcome to my first backend project! A RESTful API for sharing and liking thoughts with user authentication.
 
-Install dependencies with `npm install`, then start the server by running `npm run dev`
+## Features
 
-## View it live
+- User Authentication** - Sign up and log in with email/password
+- Create Thoughts** - Share your thoughts (5-140 characters)
+- Like Thoughts** - Increase heart count on any thought
+- Update Thoughts** - Edit your own thoughts
+- Delete Thoughts** - Remove your own thoughts
+- Password Encryption** - Bcrypt for secure password storage
 
-Every project should be deployed somewhere. Be sure to include the link to the deployed project so that the viewer can click around and see what it's all about.
+## Tech Stack
+
+Backend:
+- Node.js
+- Express.js
+Database:
+- MongoDB with Mongoose
+Authentication:
+- access tokens
+Security:
+- Bcrypt password hashing
+- CORS
+
+## API Endpoints
+Authentication endpoints:
+- POST /signup- Create new account
+- POST /login - Log in to existing account
+
+Thoughts endpoints:
+- GET /thoughts - Get all thoughts
+- GET /thoughts/:id - Get single thought
+- POST /thoughts - Create thought (authenticated)
+- PATCH /thoughts/:id - Update thought (authenticated)
+- DELETE /thoughts/:id - Delete thought (authenticated)
+- POST /thoughts/:id/like - Like a thought
+
+# ENJOY #
